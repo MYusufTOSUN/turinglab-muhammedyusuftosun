@@ -180,6 +180,22 @@ class Tape:
             hi = max(hi, head_position)
         return "".join(self._cells.get(i, self.blank) for i in range(lo, hi + 1))
 
+    def render(self, head_position: int) -> str:
+        """Şeridi, kafa konumu köşeli parantez içinde olacak şekilde döner.
+
+        Verbose mod çıktısında kullanılan biçim:
+        ``"ab[c]de"`` — kafa, c sembolü üzerindedir.
+        """
+        if not self._cells:
+            return f"[{self.blank}]"
+        lo = min(self.min_position, head_position)
+        hi = max(self.max_position, head_position)
+        parts: list[str] = []
+        for i in range(lo, hi + 1):
+            sym = self._cells.get(i, self.blank)
+            parts.append(f"[{sym}]" if i == head_position else sym)
+        return "".join(parts)
+
 
 class SingleTapeTM:
     """Tek-şeritli deterministic Turing makinesi.
@@ -401,15 +417,112 @@ class SingleTapeTM:
     ) -> RunResult:
         """Makineyi belirtilen girdi üzerinde çalıştırır.
 
+        Akış:
+            1. Girdiyi şeride 0'dan itibaren yerleştir.
+            2. Aktif durum başlangıç durumuna, kafa 0'a alınır.
+            3. Her adımda δ(state, read) aranır; bulunamazsa
+               ``no_transition`` ile durulur.
+            4. Yeni duruma geçildiğinde aktif durum ``accept_states``
+               içindeyse ``accept`` ile durulur.
+            5. ``max_steps`` aşılırsa ``timeout`` ile durulur.
+
         Args:
             input_string: Şerite yerleştirilecek başlangıç girdisi.
-            max_steps: Sonsuz döngülere karşı maksimum adım sayısı.
-            verbose: ``True`` ise her adımı stdout'a basar.
+                ``input_alphabet`` dışında bir sembol içeriyorsa
+                ``ValueError`` fırlatılır.
+            max_steps: Sonsuz döngüye karşı maksimum adım bütçesi (≥ 0).
+            verbose: ``True`` ise her adım şu biçimde stdout'a basılır:
+                ``Adım N | Durum: q | Şerit: ab[c]de | Hareket: R``.
+                Durduğunda son satır ``... | (durdu: <reason>)`` ile biter.
 
-        Note:
-            Bu metot şu anda iskelet halindedir; gerçek yürütme bir sonraki
-            commit'te eklenecektir.
+        Returns:
+            ``accept`` / ``no_transition`` / ``timeout`` durumlarından
+            birinde sonlanan çalışmaya ait :class:`RunResult`.
         """
-        raise NotImplementedError(
-            "run() henüz implemente edilmedi (sonraki commit'te eklenecek)."
+        if max_steps < 0:
+            raise ValueError(f"max_steps negatif olamaz: {max_steps}")
+
+        allowed = set(self.input_alphabet)
+        for ch in input_string:
+            if ch not in allowed:
+                raise ValueError(
+                    f"Girdi sembolü {ch!r} input_alphabet içinde değil."
+                )
+
+        tape = Tape(input_string, self.blank)
+        state = self.start_state
+        head = 0
+
+        history: list[Configuration] = [
+            Configuration(
+                step=0,
+                state=state,
+                tape=tape.to_string(head),
+                head_position=head,
+            )
+        ]
+
+        def emit(step_num: int, suffix: str) -> None:
+            """Verbose modda tek bir satır basar."""
+            if verbose:
+                print(
+                    f"Adım {step_num} | Durum: {state} | "
+                    f"Şerit: {tape.render(head)} | {suffix}"
+                )
+
+        # Başlangıç durumu zaten accept ise hemen kabul et.
+        if state in self.accept_states:
+            emit(0, "(durdu: accept)")
+            return RunResult(
+                accepted=True,
+                reason="accept",
+                steps=0,
+                final_tape=tape.to_string(head),
+                history=history,
+            )
+
+        for step_num in range(1, max_steps + 1):
+            symbol = tape.read(head)
+            t = self.transition(state, symbol)
+            if t is None:
+                emit(step_num - 1, "(durdu: no_transition)")
+                return RunResult(
+                    accepted=False,
+                    reason="no_transition",
+                    steps=step_num - 1,
+                    final_tape=tape.to_string(head),
+                    history=history,
+                )
+
+            emit(step_num - 1, f"Hareket: {t.move.value}")
+
+            tape.write(head, t.write)
+            head += 1 if t.move == Move.RIGHT else -1
+            state = t.next_state
+            history.append(
+                Configuration(
+                    step=step_num,
+                    state=state,
+                    tape=tape.to_string(head),
+                    head_position=head,
+                )
+            )
+
+            if state in self.accept_states:
+                emit(step_num, "(durdu: accept)")
+                return RunResult(
+                    accepted=True,
+                    reason="accept",
+                    steps=step_num,
+                    final_tape=tape.to_string(head),
+                    history=history,
+                )
+
+        emit(max_steps, "(durdu: timeout)")
+        return RunResult(
+            accepted=False,
+            reason="timeout",
+            steps=max_steps,
+            final_tape=tape.to_string(head),
+            history=history,
         )
