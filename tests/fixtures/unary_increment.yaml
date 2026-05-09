@@ -1,0 +1,21 @@
+name: unary_increment
+description: |
+  Tekli (unary) gösterimde sayıya 1 ekler.
+  Örnek: 111 -> 1111 (yani 3 -> 4), boş girdi -> 1 (yani 0 -> 1).
+
+states: [q_scan, q_write, q_accept]
+input_alphabet: ["1"]
+tape_alphabet: ["1", "B"]
+blank: "B"
+start_state: q_scan
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # 1) Mevcut tüm 1'leri geçip ilk B'ye ulaş.
+  - {state: q_scan, read: "1", next: q_scan,  write: "1", move: R}
+  - {state: q_scan, read: "B", next: q_write, write: "1", move: R}
+
+  # 2) Yeni 1'i yazdıktan sonra bir hücre daha gidip kabul durumuna geç
+  #    (kafa, sayının sağındaki ilk B üzerinde durur).
+  - {state: q_write, read: "B", next: q_accept, write: "B", move: L}

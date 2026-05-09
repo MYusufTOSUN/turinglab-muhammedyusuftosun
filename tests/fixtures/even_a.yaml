@@ -1,0 +1,23 @@
+name: even_a
+description: |
+  Yalnızca 'a' karakterlerinden oluşan dizgilerde uzunluğun çift sayı olup
+  olmadığını test eder. Boş dizgi de kabul edilir (uzunluk 0 çifttir).
+  Örnek: ""  -> kabul,  "aa" -> kabul,  "a"  -> ret,  "aaa" -> ret.
+
+states: [q_even, q_odd, q_accept]
+input_alphabet: ["a"]
+tape_alphabet: ["a", "B"]
+blank: "B"
+start_state: q_even
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # Çift durumunda a görmek tek duruma, tek durumunda a görmek çifte götürür.
+  - {state: q_even, read: "a", next: q_odd,    write: "a", move: R}
+  - {state: q_odd,  read: "a", next: q_even,   write: "a", move: R}
+
+  # Sayım çift bittiğinde girdi sonunda B'ye ulaşırız ve kabul ederiz.
+  # q_odd'da B görmek için bir kuralımız yok; bu durum no_transition ile
+  # otomatik olarak ret olur (uzunluk tek).
+  - {state: q_even, read: "B", next: q_accept, write: "B", move: R}

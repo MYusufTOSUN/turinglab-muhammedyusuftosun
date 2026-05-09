@@ -1,0 +1,31 @@
+name: binary_increment
+description: |
+  Bir ikili sayıya 1 ekler. En anlamlı bit solda yer alır.
+  Örnek: 1011 -> 1100, 0 -> 1, 1 -> 10, 111 -> 1000.
+
+states: [q0, q_back, q_done, q_accept]
+input_alphabet: ["0", "1"]
+tape_alphabet: ["0", "1", "B"]
+blank: "B"
+start_state: q0
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # 1) Sayının sonuna gidene kadar (B görene kadar) sağa kay.
+  - {state: q0, read: "0", next: q0,     write: "0", move: R}
+  - {state: q0, read: "1", next: q0,     write: "1", move: R}
+  - {state: q0, read: "B", next: q_back, write: "B", move: L}
+
+  # 2) En sağdan başlayarak elde takipli +1 uygula.
+  #    1 görürsen 0 yaz (elde devam) ve sola git;
+  #    0 görürsen 1 yaz ve elde tamamlandı (q_done).
+  - {state: q_back, read: "1", next: q_back, write: "0", move: L}
+  - {state: q_back, read: "0", next: q_done, write: "1", move: L}
+  # Tüm bitler 1'di: yeni bit eklenmeli (örn. 111 -> 1000).
+  - {state: q_back, read: "B", next: q_done, write: "1", move: L}
+
+  # 3) Elde tamamlandı; en başa dönüp B görünce kabul et.
+  - {state: q_done, read: "0", next: q_done,   write: "0", move: L}
+  - {state: q_done, read: "1", next: q_done,   write: "1", move: L}
+  - {state: q_done, read: "B", next: q_accept, write: "B", move: R}
