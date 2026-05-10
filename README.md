@@ -8,6 +8,86 @@
 
 ---
 
+## Hızlı Başlangıç
+
+### Kurulum
+
+```bash
+pip install -r requirements.txt
+```
+
+Tek bağımlılık vardır: YAML çözümleyici için `PyYAML`, test çalıştırıcı için `pytest`.
+Python 3.10+ gereklidir.
+
+### Kullanım Örneği
+
+```python
+from turinglab import SingleTapeTM
+
+# YAML'dan bir TM yükle
+tm = SingleTapeTM.from_yaml("tests/fixtures/binary_increment.yaml")
+
+# Çalıştır
+result = tm.run("1011", max_steps=1000)
+
+assert result.accepted is True
+assert result.reason == "accept"
+assert result.final_tape.strip("B") == "1100"
+assert len(result.history) == result.steps + 1
+
+# Tek bir adımı incelemek
+config = result.history[5]
+print(config.step, config.state, config.tape, config.head_position)
+```
+
+`verbose=True` modunda her adım stdout'a şu biçimde basılır
+(durduğunda son satır `(durdu: <reason>)` ile biter):
+
+```
+Adım 0 | Durum: q_scan | Şerit: [1]1 | Hareket: R
+Adım 1 | Durum: q_scan | Şerit: 1[1] | Hareket: R
+Adım 2 | Durum: q_scan | Şerit: 11[B] | Hareket: R
+Adım 3 | Durum: q_write | Şerit: 111[B] | Hareket: L
+Adım 4 | Durum: q_accept | Şerit: 11[1]B | (durdu: accept)
+```
+
+### Testler
+
+Tüm pytest test paketi proje kökünden çalıştırılır:
+
+```bash
+pytest tests/ -v
+```
+
+`tests/test_tm_engine.py` motorun tüm yüzeyini kapsayan 16 test
+fonksiyonu (parametrize ile 28 test örneği) içerir: üç farklı TM × beşer
+girdi, history semantiği, durma koşulları (`accept` / `no_transition` /
+`timeout`), verbose çıktı biçimi, hatalı YAML çeşitleri ve `Tape`
+sınıfının iki yönlü genişleme davranışı.
+
+### Tasarım Kararı: Sola Taşma
+
+Şerit **iki yönlü sınırsız** genişler. Kafa konumu negatif
+(`head_position < 0`) olabilir; bu durumda yazılmamış hücreler `blank`
+olarak okunur ve hata fırlatılmaz. Sebebi şudur: simetrik algoritmalar
+(dizgi kopyalama, karşılaştırma vb.) ek özel durum mantığı gerekmeden
+yazılabilir; sola taşma yapay bir hata değil, doğal bir hesaplama
+adımıdır.
+
+Bunu düşük maliyetle desteklemek için şerit `dict[int, str]` (sparse)
+yapısıyla temsil edilir. Hiç yazılmamış hücreler hiç bellekte yer
+kaplamaz; okuma sırasında otomatik olarak `blank` döner.
+
+Diğer üç durma koşulu el kitabındaki şartnameye birebir uyar:
+
+| Durum | `accepted` | `reason` |
+|---|---|---|
+| Aktif durum `accept_states` içinde | `True` | `"accept"` |
+| `δ(state, read)` tanımsız | `False` | `"no_transition"` |
+| `max_steps` aşıldı | `False` | `"timeout"` |
+
+---
+
 ## Proje Künyesi
 
 | | |
