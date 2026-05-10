@@ -80,7 +80,11 @@ class Tape:
         """Verilen konuma tek karakterlik bir sembol yazar."""
         if len(symbol) != 1:
             raise ValueError(f"Yazılan sembol tek karakter olmalı: {symbol!r}")
-        self._cells[position] = symbol
+        # Blank yazmak hücreyi 'silmek'tir; min/max sınırını şişirmesin.
+        if symbol == self.blank:
+            self._cells.pop(position, None)
+        else:
+            self._cells[position] = symbol
 
     @property
     def min_position(self) -> int:
@@ -107,7 +111,8 @@ class Tape:
         if not self._cells:
             return f"[{self.blank}]"
         lo = min(self.min_position, head_position)
-        hi = max(self.max_position, head_position)
+        # Spec örneğindeki gibi sağ uçta bir blank hücreyi de göster.
+        hi = max(self.max_position + 1, head_position)
         parts: list[str] = []
         for i in range(lo, hi + 1):
             sym = self._cells.get(i, self.blank)

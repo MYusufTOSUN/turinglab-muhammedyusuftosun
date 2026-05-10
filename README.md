@@ -25,7 +25,7 @@ Python 3.10+ gereklidir.
 from turinglab import SingleTapeTM
 
 # YAML'dan bir TM yükle
-tm = SingleTapeTM.from_yaml("tests/fixtures/binary_increment.yaml")
+tm = SingleTapeTM.from_yaml("machines/binary_increment.yaml")
 
 # Çalıştır
 result = tm.run("1011", max_steps=1000)
