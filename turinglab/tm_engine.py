@@ -1,19 +1,4 @@
-"""Tek-şeritli deterministic Turing makinesi motoru.
-
-Bu modül, YAML üzerinden tanımlanan Turing makinelerini yükleyen,
-biçimsel tutarlılığını doğrulayan ve çalıştıran çekirdek sınıfları
-içerir. Şerit temsili olarak ``dict[int, str]`` (sparse) tercih
-edilmiştir; bu sayede şerit hem sağa hem sola istenildiği kadar
-genişleyebilir ve negatif konumlar doğal olarak desteklenir.
-
-Sınıflar:
-    Move          : L/R hareket yönleri için enum.
-    Transition    : Tek bir δ kuralını tutan veri sınıfı.
-    Configuration : Çalışma sırasında tek bir adımdaki anlık görüntü.
-    RunResult     : ``run()`` çağrısının sonucunu paketleyen yapı.
-    Tape          : Sparse dict üzerine kurulu Turing şeridi.
-    SingleTapeTM  : Yükleme + doğrulama + çalıştırma çekirdeği.
-"""
+"""Tek-şeritli deterministic Turing makinesi motoru."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -25,28 +10,14 @@ import yaml
 
 
 class Move(str, Enum):
-    """Kafa hareket yönleri.
-
-    Spesifikasyon yalnızca sola (``L``) ve sağa (``R``) hareketi
-    zorunlu kılar; bu yüzden motor da yalnızca bu iki yönü kabul eder.
-    """
+    """Kafa hareket yönü: sol (L) veya sağ (R)."""
 
     LEFT = "L"
     RIGHT = "R"
 
     @classmethod
     def from_str(cls, value: str) -> "Move":
-        """YAML'dan gelen string'i ``Move`` örneğine çevirir.
-
-        Args:
-            value: ``"L"`` veya ``"R"`` (büyük/küçük fark etmez).
-
-        Returns:
-            Karşılık gelen ``Move`` üyesi.
-
-        Raises:
-            ValueError: Beklenmeyen yön değeri için.
-        """
+        """'L' veya 'R' string'ini Move değerine çevirir."""
         normalized = (value or "").strip().upper()
         for member in cls:
             if member.value == normalized:
@@ -58,7 +29,7 @@ class Move(str, Enum):
 
 @dataclass(frozen=True)
 class Transition:
-    """Tek bir δ(state, read) → (next_state, write, move) kuralı."""
+    """Tek bir δ kuralı: (state, read) -> (next_state, write, move)."""
 
     state: str
     read: str
@@ -69,14 +40,7 @@ class Transition:
 
 @dataclass
 class Configuration:
-    """Çalışmanın belirli bir adımındaki TM anlık görüntüsü.
-
-    Attributes:
-        step: 0'dan başlayan adım indeksi (history içinde sıra).
-        state: O an aktif olan kontrol durumunun adı.
-        tape: Yazılmış aralıktaki (head dahil) şeridin string hali.
-        head_position: Şerit üzerindeki mutlak kafa konumu (negatif olabilir).
-    """
+    """Bir adımdaki TM görüntüsü (durum, şerit, kafa konumu)."""
 
     step: int
     state: str
@@ -86,17 +50,7 @@ class Configuration:
 
 @dataclass
 class RunResult:
-    """``SingleTapeTM.run()`` çağrısının sonuç paketi.
-
-    Attributes:
-        accepted: Makine kabul durumunda mı durdu?
-        reason: Durma nedeni — ``"accept"``, ``"no_transition"`` ya da
-            ``"timeout"``.
-        steps: Toplam atılan adım sayısı.
-        final_tape: Çalışma sonunda şeridin (yazılmış aralıkta) string hali.
-        history: Adım 0'dan itibaren tüm konfigürasyonlar.
-            ``len(history) == steps + 1`` (başlangıç da dahil).
-    """
+    """run() çağrısının sonucunu paketleyen yapı."""
 
     accepted: bool
     reason: str
@@ -106,86 +60,50 @@ class RunResult:
 
 
 class Tape:
-    """Sparse (dict tabanlı) iki yönlü genişleyebilen Turing şeridi.
-
-    Hücreler ``dict[int, str]`` içinde tutulur; eğer bir konum sözlükte
-    yoksa, okuma sırasında ``blank`` döner. Bu yapının üç avantajı vardır:
-
-    * Negatif konumlar (kafa sola taşarsa) doğal olarak desteklenir.
-    * Bellek yalnızca yazılmış hücreler için tüketilir.
-    * Şerit görselleştirilirken yazılmış aralık (min..max) baz alınır.
-    """
+    """Sparse dict tabanlı, iki yönlü genişleyebilen Turing şeridi."""
 
     def __init__(self, input_string: str, blank: str) -> None:
-        """Yeni bir şerit kurar.
-
-        Args:
-            input_string: Başlangıçta 0'dan itibaren şeride yazılacak girdi.
-            blank: Boş hücreler için kullanılacak tek karakterlik sembol.
-
-        Raises:
-            ValueError: ``blank`` tek karakter değilse.
-        """
         if len(blank) != 1:
             raise ValueError(
                 f"Blank sembol tek karakter olmalı, gelen: {blank!r}"
             )
-        self.blank: str = blank
+        self.blank = blank
         self._cells: dict[int, str] = {}
         for i, sym in enumerate(input_string):
             self._cells[i] = sym
 
     def read(self, position: int) -> str:
-        """Verilen konumdaki sembolü döner; yazılmamışsa ``blank``."""
+        """Verilen konumdaki sembolü döner; yazılmamışsa blank."""
         return self._cells.get(position, self.blank)
 
     def write(self, position: int, symbol: str) -> None:
-        """Verilen konuma sembolü yazar.
-
-        Raises:
-            ValueError: Yazılan sembol tek karakter değilse.
-        """
+        """Verilen konuma tek karakterlik bir sembol yazar."""
         if len(symbol) != 1:
-            raise ValueError(
-                f"Yazılan sembol tek karakter olmalı: {symbol!r}"
-            )
+            raise ValueError(f"Yazılan sembol tek karakter olmalı: {symbol!r}")
         self._cells[position] = symbol
 
     @property
     def min_position(self) -> int:
-        """Yazılmış hücreler içindeki en küçük konum (yazma yoksa 0)."""
         return min(self._cells) if self._cells else 0
 
     @property
     def max_position(self) -> int:
-        """Yazılmış hücreler içindeki en büyük konum (yazma yoksa 0)."""
         return max(self._cells) if self._cells else 0
 
     def to_string(self, head_position: int | None = None) -> str:
-        """Yazılmış aralığın düz string halini döner.
-
-        Args:
-            head_position: Verilirse, gerekirse aralık kafa konumunu da
-                kapsayacak şekilde genişletilir. ``None`` ise yalnızca
-                yazılmış aralık döner.
-        """
+        """Yazılmış aralığı string olarak döner; head verilirse aralığı genişletir."""
         if not self._cells and head_position is None:
             return ""
         if not self._cells:
             return self.blank
-        lo = self.min_position
-        hi = self.max_position
+        lo, hi = self.min_position, self.max_position
         if head_position is not None:
             lo = min(lo, head_position)
             hi = max(hi, head_position)
         return "".join(self._cells.get(i, self.blank) for i in range(lo, hi + 1))
 
     def render(self, head_position: int) -> str:
-        """Şeridi, kafa konumu köşeli parantez içinde olacak şekilde döner.
-
-        Verbose mod çıktısında kullanılan biçim:
-        ``"ab[c]de"`` — kafa, c sembolü üzerindedir.
-        """
+        """Şeridi 'ab[c]de' biçiminde, kafayı köşeli parantezle göstererek döner."""
         if not self._cells:
             return f"[{self.blank}]"
         lo = min(self.min_position, head_position)
@@ -198,12 +116,7 @@ class Tape:
 
 
 class SingleTapeTM:
-    """Tek-şeritli deterministic Turing makinesi.
-
-    Doğrudan parametrelerle veya ``SingleTapeTM.from_yaml(path)`` ile
-    oluşturulabilir. ``__init__`` çağrıldığında otomatik olarak biçimsel
-    tutarlılık doğrulaması (``_validate``) yapılır.
-    """
+    """Tek-şeritli deterministic Turing makinesi."""
 
     def __init__(
         self,
@@ -219,15 +132,15 @@ class SingleTapeTM:
         transitions: Iterable[Transition],
         description: str = "",
     ) -> None:
-        self.name: str = name
-        self.description: str = description
-        self.states: tuple[str, ...] = tuple(states)
-        self.input_alphabet: tuple[str, ...] = tuple(input_alphabet)
-        self.tape_alphabet: tuple[str, ...] = tuple(tape_alphabet)
-        self.blank: str = blank
-        self.start_state: str = start_state
-        self.accept_states: frozenset[str] = frozenset(accept_states)
-        self.reject_states: frozenset[str] = frozenset(reject_states)
+        self.name = name
+        self.description = description
+        self.states = tuple(states)
+        self.input_alphabet = tuple(input_alphabet)
+        self.tape_alphabet = tuple(tape_alphabet)
+        self.blank = blank
+        self.start_state = start_state
+        self.accept_states = frozenset(accept_states)
+        self.reject_states = frozenset(reject_states)
 
         self._transitions: dict[tuple[str, str], Transition] = {}
         for t in transitions:
@@ -235,30 +148,18 @@ class SingleTapeTM:
             if key in self._transitions:
                 raise ValueError(
                     f"Çift δ kuralı: state={t.state!r}, read={t.read!r}. "
-                    "Deterministic TM'de aynı (durum, sembol) çiftine "
-                    "yalnızca tek geçiş tanımlanabilir."
+                    "Aynı (durum, sembol) çiftine yalnızca tek geçiş tanımlanabilir."
                 )
             self._transitions[key] = t
 
         self._validate()
 
     def transition(self, state: str, symbol: str) -> Transition | None:
-        """δ(state, symbol) — tanımlı değilse ``None``."""
+        """δ(state, symbol) kuralını döner; tanımsızsa None."""
         return self._transitions.get((state, symbol))
 
     def _validate(self) -> None:
-        """Yapısal tutarlılık denetimi.
-
-        Aşağıdaki koşullar sağlanmalıdır; sağlanmıyorsa ``ValueError``
-        anlamlı bir mesajla fırlatılır:
-
-        * blank tek karakter ve tape_alphabet içinde olmalı.
-        * input_alphabet ⊆ tape_alphabet ve blank ∉ input_alphabet.
-        * start_state ve accept/reject durumları states içinde tanımlı.
-        * accept ile reject kümeleri ayrık olmalı.
-        * Tüm geçişlerin durumları states içinde, sembolleri tape_alphabet
-          içinde tanımlı olmalı.
-        """
+        """Alfabe, durumlar ve geçişler için yapısal tutarlılık denetimi."""
         if len(self.blank) != 1:
             raise ValueError(
                 f"Blank sembol tek karakter olmalı, gelen: {self.blank!r}"
@@ -307,9 +208,7 @@ class SingleTapeTM:
 
         for (state, read), t in self._transitions.items():
             if state not in state_set:
-                raise ValueError(
-                    f"Geçişin kaynak durumu tanımsız: {state!r}"
-                )
+                raise ValueError(f"Geçişin kaynak durumu tanımsız: {state!r}")
             if t.next_state not in state_set:
                 raise ValueError(
                     f"Geçişin hedef durumu tanımsız: {t.next_state!r} "
@@ -328,16 +227,13 @@ class SingleTapeTM:
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "SingleTapeTM":
-        """Bir YAML dosyasından TM yükler.
-
-        Eksik alan, hatalı yapı veya tutarsız tanımlar için anlamlı
-        bir ``ValueError`` fırlatır.
+        """YAML dosyasından TM yükler. Hatalı format/eksik alan için ValueError fırlatır.
 
         Args:
             path: YAML dosyasının yolu.
 
         Returns:
-            Doğrulanmış, hazır ``SingleTapeTM`` örneği.
+            Doğrulanmış SingleTapeTM örneği.
         """
         p = Path(path)
         if not p.exists():
@@ -354,32 +250,26 @@ class SingleTapeTM:
             )
 
         required = {
-            "states",
-            "input_alphabet",
-            "tape_alphabet",
-            "blank",
-            "start_state",
-            "accept_states",
-            "transitions",
+            "states", "input_alphabet", "tape_alphabet", "blank",
+            "start_state", "accept_states", "transitions",
         }
         missing = required - data.keys()
         if missing:
             raise ValueError(f"YAML'da eksik alanlar: {sorted(missing)}")
 
-        raw_transitions = data["transitions"]
-        if not isinstance(raw_transitions, list):
+        raw = data["transitions"]
+        if not isinstance(raw, list):
             raise ValueError("transitions bir liste olmalı.")
 
         transitions: list[Transition] = []
         required_t = {"state", "read", "next", "write", "move"}
-        for idx, item in enumerate(raw_transitions):
+        for idx, item in enumerate(raw):
             if not isinstance(item, dict):
                 raise ValueError(f"transitions[{idx}] bir sözlük olmalı.")
             missing_t = required_t - item.keys()
             if missing_t:
                 raise ValueError(
-                    f"transitions[{idx}] içinde eksik alanlar: "
-                    f"{sorted(missing_t)}"
+                    f"transitions[{idx}] içinde eksik alanlar: {sorted(missing_t)}"
                 )
             try:
                 move = Move.from_str(str(item["move"]))
@@ -415,29 +305,19 @@ class SingleTapeTM:
         max_steps: int = 1000,
         verbose: bool = False,
     ) -> RunResult:
-        """Makineyi belirtilen girdi üzerinde çalıştırır.
+        """Makineyi girdi üzerinde çalıştırır.
 
-        Akış:
-            1. Girdiyi şeride 0'dan itibaren yerleştir.
-            2. Aktif durum başlangıç durumuna, kafa 0'a alınır.
-            3. Her adımda δ(state, read) aranır; bulunamazsa
-               ``no_transition`` ile durulur.
-            4. Yeni duruma geçildiğinde aktif durum ``accept_states``
-               içindeyse ``accept`` ile durulur.
-            5. ``max_steps`` aşılırsa ``timeout`` ile durulur.
+        Üç şekilde durur: kabul durumuna ulaşma (accept), eşleşen δ kuralı
+        bulunamaması (no_transition), max_steps aşımı (timeout).
+        verbose=True ise her adım stdout'a basılır.
 
         Args:
             input_string: Şerite yerleştirilecek başlangıç girdisi.
-                ``input_alphabet`` dışında bir sembol içeriyorsa
-                ``ValueError`` fırlatılır.
-            max_steps: Sonsuz döngüye karşı maksimum adım bütçesi (≥ 0).
-            verbose: ``True`` ise her adım şu biçimde stdout'a basılır:
-                ``Adım N | Durum: q | Şerit: ab[c]de | Hareket: R``.
-                Durduğunda son satır ``... | (durdu: <reason>)`` ile biter.
+            max_steps: Maksimum adım bütçesi.
+            verbose: Adımlar stdout'a basılsın mı?
 
         Returns:
-            ``accept`` / ``no_transition`` / ``timeout`` durumlarından
-            birinde sonlanan çalışmaya ait :class:`RunResult`.
+            Çalışmanın sonucunu içeren RunResult.
         """
         if max_steps < 0:
             raise ValueError(f"max_steps negatif olamaz: {max_steps}")
@@ -463,14 +343,12 @@ class SingleTapeTM:
         ]
 
         def emit(step_num: int, suffix: str) -> None:
-            """Verbose modda tek bir satır basar."""
             if verbose:
                 print(
                     f"Adım {step_num} | Durum: {state} | "
                     f"Şerit: {tape.render(head)} | {suffix}"
                 )
 
-        # Başlangıç durumu zaten accept ise hemen kabul et.
         if state in self.accept_states:
             emit(0, "(durdu: accept)")
             return RunResult(

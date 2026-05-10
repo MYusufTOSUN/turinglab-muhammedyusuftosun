@@ -1,15 +1,4 @@
-"""SingleTapeTM motoru için birim testleri.
-
-Test kapsamı (ödev rubriğine uygun):
-* 3 farklı TM × 5 girdi parametrize (binary_increment, unary_increment,
-  even_a) — toplam 15 davranışsal test örneği.
-* Durma koşulları: accept (başlangıçta), no_transition, timeout.
-* History semantiği: ``len(history) == steps + 1`` ve adım numaralarının
-  sıralılığı.
-* Verbose mod çıktı biçimi.
-* Hatalı YAML / hatalı δ kuralları için anlamlı ``ValueError``.
-* Tape sınıfının iki yönlü genişleme davranışı.
-"""
+"""SingleTapeTM motoru için birim testleri."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,15 +12,9 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 def _write_yaml(tmp_path: Path, text: str, name: str = "tm.yaml") -> Path:
-    """Verilen YAML metnini geçici bir dosyaya yazıp yolunu döner."""
     p = tmp_path / name
     p.write_text(text, encoding="utf-8")
     return p
-
-
-# ---------------------------------------------------------------------------
-# 3 farklı TM × 5'er girdi  (run() doğruluğu)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -86,16 +69,10 @@ def test_even_a(input_string: str, expected_acc: bool) -> None:
     assert r.accepted is expected_acc
 
 
-# ---------------------------------------------------------------------------
-# History semantiği
-# ---------------------------------------------------------------------------
-
-
 def test_history_length_matches_steps() -> None:
     tm = SingleTapeTM.from_yaml(FIXTURES_DIR / "binary_increment.yaml")
     r = tm.run("1011", max_steps=2000)
     assert len(r.history) == r.steps + 1
-    # İlk konfigürasyon başlangıç durumudur.
     assert r.history[0].step == 0
     assert r.history[0].state == tm.start_state
     assert r.history[0].head_position == 0
@@ -106,17 +83,10 @@ def test_history_records_step_progression() -> None:
     r = tm.run("111", max_steps=100)
     for i, cfg in enumerate(r.history):
         assert cfg.step == i
-    # Son konfigürasyon kabul durumunda olmalı.
     assert r.history[-1].state in tm.accept_states
 
 
-# ---------------------------------------------------------------------------
-# Durma koşulları
-# ---------------------------------------------------------------------------
-
-
 def test_timeout(tmp_path: Path) -> None:
-    """Sonsuz döngüye giren bir TM ``max_steps`` ile durmalı."""
     yaml_text = """
 name: spinner
 states: [q0]
@@ -137,7 +107,6 @@ transitions:
 
 
 def test_no_transition(tmp_path: Path) -> None:
-    """Eşleşen δ kuralı yoksa ``no_transition`` ile durulmalı."""
     yaml_text = """
 name: stuck
 states: [q0]
@@ -153,12 +122,10 @@ transitions:
     r = tm.run("110", max_steps=100)
     assert r.accepted is False
     assert r.reason == "no_transition"
-    # 1, 1 başarıyla okundu; sonra 0'da kuralsız kaldı.
     assert r.steps == 2
 
 
 def test_accept_at_start(tmp_path: Path) -> None:
-    """Başlangıç durumu accept ise kabul ile birlikte sıfır adımda durulmalı."""
     yaml_text = """
 name: trivial
 states: [q_acc]
@@ -177,30 +144,18 @@ transitions: []
     assert len(r.history) == 1
 
 
-# ---------------------------------------------------------------------------
-# Verbose mod
-# ---------------------------------------------------------------------------
-
-
 def test_verbose_format(capsys) -> None:
-    """``verbose=True`` her adımı şartnameye uygun biçimde basmalı."""
     tm = SingleTapeTM.from_yaml(FIXTURES_DIR / "unary_increment.yaml")
     tm.run("1", max_steps=20, verbose=True)
     out = capsys.readouterr().out
     lines = [ln for ln in out.splitlines() if ln.strip()]
-    assert len(lines) >= 2, "Verbose mod en az iki satır basmalı"
-    assert lines[0].startswith("Adım 0 |"), "İlk satır 'Adım 0' ile başlamalı"
+    assert len(lines) >= 2
+    assert lines[0].startswith("Adım 0 |")
     for ln in lines:
-        assert "[" in ln and "]" in ln, "Kafa konumu köşeli parantezle gösterilmeli"
+        assert "[" in ln and "]" in ln
         assert "Durum:" in ln
         assert "Şerit:" in ln
-    # Son satır halt göstergesini içermeli.
     assert "(durdu:" in lines[-1]
-
-
-# ---------------------------------------------------------------------------
-# Hatalı YAML / hatalı δ kuralları
-# ---------------------------------------------------------------------------
 
 
 def test_yaml_missing_field(tmp_path: Path) -> None:
@@ -210,7 +165,6 @@ input_alphabet: ["1"]
 tape_alphabet: ["1", "B"]
 blank: B
 start_state: q0
-# accept_states ve transitions kasıtlı olarak yok
 """
     p = _write_yaml(tmp_path, yaml_text, "missing.yaml")
     with pytest.raises(ValueError, match="eksik alanlar"):
@@ -274,15 +228,9 @@ def test_yaml_file_not_found(tmp_path: Path) -> None:
 
 
 def test_run_rejects_input_outside_alphabet() -> None:
-    """Girdide ``input_alphabet`` dışı sembol varsa ``ValueError`` fırlatılır."""
     tm = SingleTapeTM.from_yaml(FIXTURES_DIR / "binary_increment.yaml")
     with pytest.raises(ValueError, match="input_alphabet"):
         tm.run("1012", max_steps=100)
-
-
-# ---------------------------------------------------------------------------
-# Tape sınıfı (sparse + iki yönlü genişleme)
-# ---------------------------------------------------------------------------
 
 
 def test_tape_extends_to_negative_positions() -> None:
@@ -292,5 +240,4 @@ def test_tape_extends_to_negative_positions() -> None:
     assert t.read(-1) == "B"
     assert t.read(0) == "a"
     assert t.read(1) == "b"
-    # Yazılmış aralık [-3..1]; arada okunmamış hücreler blank ile dolar.
     assert t.to_string() == "XBBab"

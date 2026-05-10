@@ -1,16 +1,4 @@
-"""TuringLab — Tek-şeritli Turing makinesi simülatörü.
-
-Hesaplama Kuramı (Selçuk Üniversitesi · Bilgisayar Mühendisliği) dersi
-final ödevi için geliştirilmiş; YAML üzerinden tanımlanan deterministic
-Turing makinelerini yükleyip çalıştıran bir kütüphanedir.
-
-Tipik kullanım:
-    >>> from turinglab import SingleTapeTM
-    >>> tm = SingleTapeTM.from_yaml("machines/binary_increment.yaml")
-    >>> result = tm.run("1011", max_steps=1000)
-    >>> result.accepted
-    True
-"""
+"""TuringLab — tek-şeritli Turing makinesi simülatörü."""
 
 from turinglab.tm_engine import (
     Configuration,
