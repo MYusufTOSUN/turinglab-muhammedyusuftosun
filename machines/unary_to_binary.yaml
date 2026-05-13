@@ -1,0 +1,43 @@
+name: unary_to_binary
+description: Unary sayıyı ikiliye çevirir. Örn. 111 -> 11, 1111 -> 100.
+
+states: [q_scan, q_setup_sep, q_rewind, q_main, q_check_unary, q_seek_bin, q_increment, q_accept]
+input_alphabet: ["1"]
+tape_alphabet: ["0", "1", "B", "X"]
+blank: "B"
+start_state: q_scan
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # Setup: girdinin sonuna git, X sınırı koy, sağına ilk ikili degeri 0 yaz
+  - {state: q_scan,      read: "1", next: q_scan,         write: "1", move: R}
+  - {state: q_scan,      read: "B", next: q_setup_sep,    write: "X", move: R}
+  - {state: q_setup_sep, read: "B", next: q_rewind,       write: "0", move: L}
+
+  # Sol uca geri sar
+  - {state: q_rewind, read: "0", next: q_rewind, write: "0", move: L}
+  - {state: q_rewind, read: "1", next: q_rewind, write: "1", move: L}
+  - {state: q_rewind, read: "X", next: q_rewind, write: "X", move: L}
+  - {state: q_rewind, read: "B", next: q_main,   write: "B", move: R}
+
+  # Ana döngü: sağa giderek X sınırını ara
+  - {state: q_main, read: "1", next: q_main,         write: "1", move: R}
+  - {state: q_main, read: "X", next: q_check_unary,  write: "X", move: L}
+
+  # Sınırın hemen solunda bir 1 var mı? Varsa tüket; yoksa kabul (tüm unary X oldu)
+  - {state: q_check_unary, read: "1", next: q_seek_bin, write: "X", move: R}
+  - {state: q_check_unary, read: "X", next: q_accept,   write: "X", move: R}
+  - {state: q_check_unary, read: "B", next: q_accept,   write: "B", move: R}
+
+  # Ikili sayacın sağ ucuna git (1, X ve ikili haneleri geç)
+  - {state: q_seek_bin, read: "1", next: q_seek_bin,  write: "1", move: R}
+  - {state: q_seek_bin, read: "X", next: q_seek_bin,  write: "X", move: R}
+  - {state: q_seek_bin, read: "0", next: q_seek_bin,  write: "0", move: R}
+  - {state: q_seek_bin, read: "B", next: q_increment, write: "B", move: L}
+
+  # Taşımalı artırma: 0 görürsen 1 yaz ve bitir; 1 görürsen 0 yaz ve carry'yi sola taşı;
+  # X'e taşarsan ikili bir hane uzar (X'in üstüne 1 yazılır)
+  - {state: q_increment, read: "0", next: q_rewind,    write: "1", move: L}
+  - {state: q_increment, read: "1", next: q_increment, write: "0", move: L}
+  - {state: q_increment, read: "X", next: q_rewind,    write: "1", move: L}
