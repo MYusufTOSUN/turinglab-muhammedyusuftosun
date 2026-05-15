@@ -126,3 +126,58 @@ verdict bağlayıcı, ret" idi. Test `11011#1110` ile (27 vs 14, sonuç 27 > 14)
 ret çıkınca durdum ve düşündüm: aslında ileride 2. tükenirse 1. daha uzun
 demektir ve uzunluk farkı leftmost-difference'tan daha güçlü. Bu davranışı
 `q_seek2_lt_post` 'B' okuduğunda doğrudan `q_accept`'e gitmesiyle yazdım.
+
+## TM-3 · Dizgi Kopyalayıcı
+
+**Dosya:** `machines/string_copy.yaml`
+**Girdi:** `a` ve `b`'den oluşan bir dizgi (örn. `abba`)
+**Çıktı:** `<girdi>#<girdi>` (örn. `abba#abba`)
+
+### 1. Strateji
+
+Klasik mark-and-copy yaklaşımı:
+
+1. Önce girdinin sonuna `#` koyuyorum.
+2. Her iterasyonda girdinin en soldaki işaretsiz harfini bul: `a` ise `A`, `b`
+   ise `D` ile işaretle.
+3. Sağa giderek `#`'i de geçip kopyalanmış kısmın sağ ucundaki ilk B'ye o
+   harfin orijinalini yaz.
+4. Sol uca geri dön ve bir sonraki işaretsiz harfe geç.
+5. `q_main` `#` okuduğunda tüm girdi işaretlenmiştir; kabul.
+
+Şeritte sonunda `AADA#abba` gibi bir görüntü olur; orijinal görüntüye dönmek
+isteniyorsa test tarafında `A → a, D → b` replace yapılır (kararın gerekçesi:
+TM içinde "unmark" fazı eklemek 4-5 ek state istiyordu; basit ve doğru olan
+bu yaklaşım daha temiz).
+
+### 2. Durum sayısı
+
+6 durum: `q_setup_scan`, `q_rewind`, `q_main`, `q_copy_a_right`,
+`q_copy_b_right`, `q_accept`. Sade çünkü "hangi harfi kopyalayacağım" bilgisini
+state ismiyle taşıyorum, ek bilgi gerekmiyor.
+
+### 3. Şerit alfabesi
+
+`{a, b, #, B, A, D}`. Spec metni "A ve B'" diye öneriyordu ama `B'` tek karakter
+değil (apostroflu) ve motor tek karakterlik semboller bekliyor, bu yüzden
+`B'` yerine `D`'yi seçtim. `A` = işaretli `a`, `D` = işaretli `b`. Çakışma yok.
+
+### 4. Karmaşıklık
+
+n uzunluğundaki girdi için her harfi kopyalamak O(n) tarama gerektiriyor
+(sola git, en soldaki işaretsizi bul; sağa git, ilk B'ye yaz; geri dön).
+n harf olduğu için toplam **O(n²)**. n=6 için 147 adım çıktı testte; n=4 için
+75 adım — kabaca kuadratik büyüme.
+
+### 5. Hata ayıklama hikayesi
+
+İlk denemede setup fazını ayrı bir state ile (`q_init_done`) yazıp '#' yazımı
+sonrası bir cell sağa gidiyordum, sonra rewind ediyordum — gereksiz bir state'di.
+`q_setup_scan` B okuduğunda hem '#' yazıp hem de L yapıp doğrudan `q_rewind`'e
+geçince bir state azaldı.
+
+Asıl bug `q_rewind`'deydi: A ve D için transition eklemeyi unutmuştum. Setup
+sonrası ilk rewind (henüz A/D yokken) sorunsuzdu, ama 2. iterasyonda sola
+dönerken A okuyunca makine duruyordu (no_transition). Test `abba` için 11.
+adımda halt etti; verbose modu açıp `Adım 11 | Durum: q_rewind | Şerit: Abb[A]...`
+satırını görünce `q_rewind` transition listesinin eksik olduğunu anladım.

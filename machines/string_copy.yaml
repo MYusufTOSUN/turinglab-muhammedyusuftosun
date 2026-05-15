@@ -1,0 +1,44 @@
+name: string_copy
+description: a/b dizgisini # ayraçla kopyalar. Örn. abba -> abba#abba.
+
+states: [q_setup_scan, q_rewind, q_main, q_copy_a_right, q_copy_b_right, q_accept]
+
+input_alphabet: ["a", "b"]
+tape_alphabet: ["a", "b", "#", "B", "A", "D"]
+blank: "B"
+start_state: q_setup_scan
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # Setup: girdinin sonuna git, oraya # işaretini koy, sola dön
+  - {state: q_setup_scan, read: "a", next: q_setup_scan, write: "a", move: R}
+  - {state: q_setup_scan, read: "b", next: q_setup_scan, write: "b", move: R}
+  - {state: q_setup_scan, read: "B", next: q_rewind,     write: "#", move: L}
+
+  # Sol uca dön (A ve D işaretleri için de transition var; ileride lazım olacak)
+  - {state: q_rewind, read: "a", next: q_rewind, write: "a", move: L}
+  - {state: q_rewind, read: "b", next: q_rewind, write: "b", move: L}
+  - {state: q_rewind, read: "A", next: q_rewind, write: "A", move: L}
+  - {state: q_rewind, read: "D", next: q_rewind, write: "D", move: L}
+  - {state: q_rewind, read: "#", next: q_rewind, write: "#", move: L}
+  - {state: q_rewind, read: "B", next: q_main,   write: "B", move: R}
+
+  # Ana döngü: en soldaki işaretsiz harfi bul; A/D'leri atla; '#' görürsen bittik
+  - {state: q_main, read: "A", next: q_main,           write: "A", move: R}
+  - {state: q_main, read: "D", next: q_main,           write: "D", move: R}
+  - {state: q_main, read: "a", next: q_copy_a_right,   write: "A", move: R}
+  - {state: q_main, read: "b", next: q_copy_b_right,   write: "D", move: R}
+  - {state: q_main, read: "#", next: q_accept,         write: "#", move: R}
+
+  # 'a' kopyala: sağa git, kalan girdiyi, '#' ve sağ taraftaki kopyaları geç, ilk B'ye 'a' yaz
+  - {state: q_copy_a_right, read: "a", next: q_copy_a_right, write: "a", move: R}
+  - {state: q_copy_a_right, read: "b", next: q_copy_a_right, write: "b", move: R}
+  - {state: q_copy_a_right, read: "#", next: q_copy_a_right, write: "#", move: R}
+  - {state: q_copy_a_right, read: "B", next: q_rewind,       write: "a", move: L}
+
+  # 'b' kopyala: aynı mantık
+  - {state: q_copy_b_right, read: "a", next: q_copy_b_right, write: "a", move: R}
+  - {state: q_copy_b_right, read: "b", next: q_copy_b_right, write: "b", move: R}
+  - {state: q_copy_b_right, read: "#", next: q_copy_b_right, write: "#", move: R}
+  - {state: q_copy_b_right, read: "B", next: q_rewind,       write: "b", move: L}

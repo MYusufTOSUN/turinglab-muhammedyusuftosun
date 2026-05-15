@@ -87,3 +87,48 @@ def test_binary_compare_equal_zero() -> None:
     tm = SingleTapeTM.from_yaml(MACHINES_DIR / "binary_compare.yaml")
     r = tm.run("0#0", max_steps=100)
     assert r.accepted is False
+
+
+def _copy_result(final_tape: str) -> str:
+    """A/D işaretlerini orijinal a/b'ye çevir, B kalıntılarını sıyır."""
+    return final_tape.replace("A", "a").replace("D", "b").strip("B")
+
+
+@pytest.mark.parametrize(
+    "input_string, expected",
+    [
+        ("a", "a#a"),
+        ("b", "b#b"),
+        ("ab", "ab#ab"),
+        ("abba", "abba#abba"),
+        ("aaab", "aaab#aaab"),
+        ("bbab", "bbab#bbab"),
+    ],
+)
+def test_string_copy(input_string: str, expected: str) -> None:
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "string_copy.yaml")
+    r = tm.run(input_string, max_steps=10000)
+    assert r.accepted is True
+    assert _copy_result(r.final_tape) == expected
+
+
+def test_string_copy_empty_input() -> None:
+    """Boş girdi için çıktı sadece '#'."""
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "string_copy.yaml")
+    r = tm.run("", max_steps=100)
+    assert r.accepted is True
+    assert _copy_result(r.final_tape) == "#"
+
+
+def test_string_copy_longer_input() -> None:
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "string_copy.yaml")
+    r = tm.run("abbabb", max_steps=10000)
+    assert r.accepted is True
+    assert _copy_result(r.final_tape) == "abbabb#abbabb"
+
+
+def test_string_copy_rejects_non_input_alphabet() -> None:
+    """input_alphabet sadece {a, b}; başka sembol girilirse ValueError."""
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "string_copy.yaml")
+    with pytest.raises(ValueError, match="input_alphabet"):
+        tm.run("abc", max_steps=100)
