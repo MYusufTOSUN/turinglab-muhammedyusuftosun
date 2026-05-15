@@ -1,0 +1,108 @@
+name: binary_compare
+description: Iki ikili sayıyı '#' ayracıyla karşılaştırır. Birinci > ikinci ise kabul.
+
+states:
+  - q_left_eq
+  - q_seek2_eq_0_pre
+  - q_seek2_eq_0_post
+  - q_seek2_eq_1_pre
+  - q_seek2_eq_1_post
+  - q_rewind_eq
+  - q_left_gt
+  - q_seek2_gt_pre
+  - q_seek2_gt_post
+  - q_rewind_gt
+  - q_left_lt
+  - q_seek2_lt_pre
+  - q_seek2_lt_post
+  - q_rewind_lt
+  - q_first_done_gt
+  - q_accept
+
+input_alphabet: ["0", "1", "#"]
+tape_alphabet: ["0", "1", "#", "B", "X", "Y"]
+blank: "B"
+start_state: q_left_eq
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # ---- eq mod: 1. sayıdan bir hane tüket (X), 2. sayının MSB'siyle karşılaştır
+  - {state: q_left_eq, read: "X", next: q_left_eq,         write: "X", move: R}
+  - {state: q_left_eq, read: "0", next: q_seek2_eq_0_pre,  write: "X", move: R}
+  - {state: q_left_eq, read: "1", next: q_seek2_eq_1_pre,  write: "X", move: R}
+  # '#' okumak eq modda = 1. tükendi, henüz fark yok -> ret (no_transition)
+
+  - {state: q_seek2_eq_0_pre, read: "0", next: q_seek2_eq_0_pre,  write: "0", move: R}
+  - {state: q_seek2_eq_0_pre, read: "1", next: q_seek2_eq_0_pre,  write: "1", move: R}
+  - {state: q_seek2_eq_0_pre, read: "#", next: q_seek2_eq_0_post, write: "#", move: R}
+
+  - {state: q_seek2_eq_0_post, read: "Y", next: q_seek2_eq_0_post, write: "Y", move: R}
+  - {state: q_seek2_eq_0_post, read: "0", next: q_rewind_eq,       write: "Y", move: L}  # 0=0
+  - {state: q_seek2_eq_0_post, read: "1", next: q_rewind_lt,       write: "Y", move: L}  # 0<1 -> lt
+  - {state: q_seek2_eq_0_post, read: "B", next: q_accept,          write: "B", move: R}  # 2. boş, 1. uzun
+
+  - {state: q_seek2_eq_1_pre, read: "0", next: q_seek2_eq_1_pre,  write: "0", move: R}
+  - {state: q_seek2_eq_1_pre, read: "1", next: q_seek2_eq_1_pre,  write: "1", move: R}
+  - {state: q_seek2_eq_1_pre, read: "#", next: q_seek2_eq_1_post, write: "#", move: R}
+
+  - {state: q_seek2_eq_1_post, read: "Y", next: q_seek2_eq_1_post, write: "Y", move: R}
+  - {state: q_seek2_eq_1_post, read: "0", next: q_rewind_gt,       write: "Y", move: L}  # 1>0 -> gt
+  - {state: q_seek2_eq_1_post, read: "1", next: q_rewind_eq,       write: "Y", move: L}  # 1=1
+  - {state: q_seek2_eq_1_post, read: "B", next: q_accept,          write: "B", move: R}  # 1. uzun
+
+  - {state: q_rewind_eq, read: "0", next: q_rewind_eq, write: "0", move: L}
+  - {state: q_rewind_eq, read: "1", next: q_rewind_eq, write: "1", move: L}
+  - {state: q_rewind_eq, read: "X", next: q_rewind_eq, write: "X", move: L}
+  - {state: q_rewind_eq, read: "Y", next: q_rewind_eq, write: "Y", move: L}
+  - {state: q_rewind_eq, read: "#", next: q_rewind_eq, write: "#", move: L}
+  - {state: q_rewind_eq, read: "B", next: q_left_eq,   write: "B", move: R}
+
+  # ---- gt mod: verdict 1. > 2. (bir pozisyonda); lockstep tüketmeye devam
+  - {state: q_left_gt, read: "X", next: q_left_gt,        write: "X", move: R}
+  - {state: q_left_gt, read: "0", next: q_seek2_gt_pre,   write: "X", move: R}
+  - {state: q_left_gt, read: "1", next: q_seek2_gt_pre,   write: "X", move: R}
+  - {state: q_left_gt, read: "#", next: q_first_done_gt,  write: "#", move: R}
+
+  - {state: q_seek2_gt_pre, read: "0", next: q_seek2_gt_pre,  write: "0", move: R}
+  - {state: q_seek2_gt_pre, read: "1", next: q_seek2_gt_pre,  write: "1", move: R}
+  - {state: q_seek2_gt_pre, read: "#", next: q_seek2_gt_post, write: "#", move: R}
+
+  - {state: q_seek2_gt_post, read: "Y", next: q_seek2_gt_post, write: "Y", move: R}
+  - {state: q_seek2_gt_post, read: "0", next: q_rewind_gt,     write: "Y", move: L}
+  - {state: q_seek2_gt_post, read: "1", next: q_rewind_gt,     write: "Y", move: L}
+  - {state: q_seek2_gt_post, read: "B", next: q_accept,        write: "B", move: R}  # 1. uzun, gt -> kabul
+
+  - {state: q_rewind_gt, read: "0", next: q_rewind_gt, write: "0", move: L}
+  - {state: q_rewind_gt, read: "1", next: q_rewind_gt, write: "1", move: L}
+  - {state: q_rewind_gt, read: "X", next: q_rewind_gt, write: "X", move: L}
+  - {state: q_rewind_gt, read: "Y", next: q_rewind_gt, write: "Y", move: L}
+  - {state: q_rewind_gt, read: "#", next: q_rewind_gt, write: "#", move: L}
+  - {state: q_rewind_gt, read: "B", next: q_left_gt,   write: "B", move: R}
+
+  # ---- lt mod: verdict 2. > 1. (bir pozisyonda); 1. uzun olursa override -> kabul
+  - {state: q_left_lt, read: "X", next: q_left_lt,       write: "X", move: R}
+  - {state: q_left_lt, read: "0", next: q_seek2_lt_pre,  write: "X", move: R}
+  - {state: q_left_lt, read: "1", next: q_seek2_lt_pre,  write: "X", move: R}
+  # '#' okumak lt modda = 1. tükendi, ya 2. uzun (ret) ya da eşit uzunlukta lt (ret) -> ret
+
+  - {state: q_seek2_lt_pre, read: "0", next: q_seek2_lt_pre,  write: "0", move: R}
+  - {state: q_seek2_lt_pre, read: "1", next: q_seek2_lt_pre,  write: "1", move: R}
+  - {state: q_seek2_lt_pre, read: "#", next: q_seek2_lt_post, write: "#", move: R}
+
+  - {state: q_seek2_lt_post, read: "Y", next: q_seek2_lt_post, write: "Y", move: R}
+  - {state: q_seek2_lt_post, read: "0", next: q_rewind_lt,     write: "Y", move: L}
+  - {state: q_seek2_lt_post, read: "1", next: q_rewind_lt,     write: "Y", move: L}
+  - {state: q_seek2_lt_post, read: "B", next: q_accept,        write: "B", move: R}  # 1. uzun -> kabul
+
+  - {state: q_rewind_lt, read: "0", next: q_rewind_lt, write: "0", move: L}
+  - {state: q_rewind_lt, read: "1", next: q_rewind_lt, write: "1", move: L}
+  - {state: q_rewind_lt, read: "X", next: q_rewind_lt, write: "X", move: L}
+  - {state: q_rewind_lt, read: "Y", next: q_rewind_lt, write: "Y", move: L}
+  - {state: q_rewind_lt, read: "#", next: q_rewind_lt, write: "#", move: L}
+  - {state: q_rewind_lt, read: "B", next: q_left_lt,   write: "B", move: R}
+
+  # ---- 1. gt modda tükendi: 2. de bittiyse kabul, hane kaldıysa ret
+  - {state: q_first_done_gt, read: "Y", next: q_first_done_gt, write: "Y", move: R}
+  - {state: q_first_done_gt, read: "B", next: q_accept,        write: "B", move: R}
+  # '0' veya '1' okursa 2. uzun demek -> no_transition -> ret

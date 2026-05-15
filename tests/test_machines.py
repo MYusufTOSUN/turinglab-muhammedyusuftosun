@@ -48,3 +48,42 @@ def test_unary_to_binary_input_alphabet_only_one() -> None:
     tm = SingleTapeTM.from_yaml(MACHINES_DIR / "unary_to_binary.yaml")
     with pytest.raises(ValueError, match="input_alphabet"):
         tm.run("110", max_steps=100)
+
+
+@pytest.mark.parametrize(
+    "input_string, expected_accept",
+    [
+        # kabul (1. > 2.)
+        ("1#0", True),
+        ("10#1", True),
+        ("1100#1011", True),
+        # ret (1. <= 2.)
+        ("0#1", False),
+        ("1011#1100", False),
+        ("1011#1011", False),
+    ],
+)
+def test_binary_compare(input_string: str, expected_accept: bool) -> None:
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "binary_compare.yaml")
+    r = tm.run(input_string, max_steps=10000)
+    assert r.accepted is expected_accept
+
+
+def test_binary_compare_first_longer_with_lt_position() -> None:
+    """Erken bir pozisyonda 2. büyük olsa bile 1. daha uzunsa 1. kabul edilir."""
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "binary_compare.yaml")
+    r = tm.run("11011#1110", max_steps=10000)  # 27 > 14
+    assert r.accepted is True
+
+
+def test_binary_compare_second_longer() -> None:
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "binary_compare.yaml")
+    r = tm.run("11#100", max_steps=10000)  # 3 < 4
+    assert r.accepted is False
+
+
+def test_binary_compare_equal_zero() -> None:
+    """Sıfır eşitliği: 0#0 ret (kesinlikle büyük değil)."""
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "binary_compare.yaml")
+    r = tm.run("0#0", max_steps=100)
+    assert r.accepted is False

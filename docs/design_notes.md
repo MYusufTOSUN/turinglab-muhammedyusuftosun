@@ -68,3 +68,61 @@ Bu küçük değişiklik tüm tasarımı sadeleştirdi.
 (`write: "X"` yerine `write: "1"` kalmıştı kopyala-yapıştırdan), tüketim olmuyordu ve
 sonsuz döngü oluştu — timeout'a takılınca farkettim. YAML'da bir transition daha
 yazarken aynısını yapmamak için her bir kuralı çift kontrol ettim.
+
+## TM-2 · İki İkili Sayıyı Karşılaştıran TM
+
+**Dosya:** `machines/binary_compare.yaml`
+**Girdi:** Birinci ve ikinci ikili sayı `#` ayraçla (örn. `1011#1100`)
+**Kabul:** Birinci sayı ikincisinden kesinlikle büyükse; eşit veya küçükse ret.
+
+### 1. Strateji
+
+MSB-first çiftleme. Her iterasyonda 1. sayının en soldaki tüketilmemiş hanesini
+`X` ile, 2. sayının en soldaki tüketilmemiş hanesini `Y` ile işaretliyorum. İlk
+fark gördüğüm pozisyonda verdict'i state'te saklıyorum: eq (henüz fark yok),
+gt (1. büyüktü), lt (2. büyüktü). Sonunda iki olgu birleşir:
+
+- 1. önce biterse → 2. uzun → ret (uzunluk verdict'i ezer)
+- 2. önce biterse → 1. uzun → kabul (uzunluk verdict'i ezer)
+- İkisi de aynı anda biterse: gt → kabul, eq/lt → ret
+
+Yani lt modunda bile 2. boşalırsa 1. kabul ediliyor. Bu doğru, çünkü öncüsüz
+ikili gösterimde uzun olan her zaman daha büyüktür.
+
+### 2. Durum sayısı
+
+16 durum: 3 mod (eq/gt/lt) × {sol-tara, sağ-tara-pre-#, sağ-tara-post-#, rewind}
+= 12 ana durum, artı `q_first_done_gt`, `q_accept` ve eq modunun consumed
+digit değerini hatırlamak için 2 ekstra seek state'i.
+
+Pre-# ve post-# ayrımı kaçınılmaz oldu çünkü TM kafa bir '0' veya '1' okuduğunda
+"bu 1. sayıya mı yoksa 2. sayıya mı ait?" sorusunu pozisyondan bilmediği için
+state üzerinden taşımak zorunda. Bunu single state'e indirme yolunu bulamadım.
+
+### 3. Şerit alfabesi
+
+`{0, 1, #, B, X, Y}`. `X` = 1. sayıdan tüketilen hane, `Y` = 2. sayıdan
+tüketilen hane. Tek X yetmedi çünkü "şu pozisyondaki X 1. taraftan mı 2.
+taraftan mı?" bilgisini kayıp ediyordum.
+
+### 4. Karmaşıklık
+
+Girdi uzunluğu *n* (toplam karakter) için her tur taramalı (sol → orta → sağ →
+geri) ve O(n) sürüyor. En fazla *n/2* tur yapılır (her tur en az 2 karakter
+tüketir, biri X biri Y). Toplam **O(n²)**.
+
+### 5. Hata ayıklama hikayesi
+
+İlk versiyonda `q_seek2_X_post` Y yazdıktan sonra R yapıyordu, sonra `q_rewind`
+çağrılıyordu. Hatamı testlerle gördüm: kısa girdilerde (`1#0` gibi) Y yazıldıktan
+sonra head sağ uçtaki B üzerine geldi; rewind transition'ı `B → R, q_left_X`
+diye yazılıydı ve makine tersine, sağa doğru gidiyordu. 13 testten 5'i fail oldu,
+hep "kabul beklenirken ret" şeklinde. Düzeltme: seek_post'ta Y yazdıktan sonra
+R yerine L; bu sayede rewind, head'i 2. sayının sol komşusuna (zaten yazılmış bir
+Y veya '#') koyuyor ve oradan sola gidip sol uç B'sini bulabiliyor.
+
+İkinci kafa karışıklığı: lt modunda 1. uzun çıkarsa ne olmalı? İlk içgüdüm "lt
+verdict bağlayıcı, ret" idi. Test `11011#1110` ile (27 vs 14, sonuç 27 > 14)
+ret çıkınca durdum ve düşündüm: aslında ileride 2. tükenirse 1. daha uzun
+demektir ve uzunluk farkı leftmost-difference'tan daha güçlü. Bu davranışı
+`q_seek2_lt_post` 'B' okuduğunda doğrudan `q_accept`'e gitmesiyle yazdım.
