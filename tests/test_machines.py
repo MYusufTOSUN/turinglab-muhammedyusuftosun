@@ -132,3 +132,42 @@ def test_string_copy_rejects_non_input_alphabet() -> None:
     tm = SingleTapeTM.from_yaml(MACHINES_DIR / "string_copy.yaml")
     with pytest.raises(ValueError, match="input_alphabet"):
         tm.run("abc", max_steps=100)
+
+
+@pytest.mark.parametrize(
+    "input_string, expected_accept",
+    [
+        # kabul (dengeli)
+        ("", True),
+        ("()", True),
+        ("(())", True),
+        ("()()", True),
+        ("((()))", True),
+        ("(()())", True),
+        # ret (dengesiz)
+        ("(", False),
+        (")", False),
+        ("(()", False),
+        ("())", False),
+        (")(", False),
+        ("()(", False),
+    ],
+)
+def test_parentheses_balance(input_string: str, expected_accept: bool) -> None:
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "student_choice.yaml")
+    r = tm.run(input_string, max_steps=10000)
+    assert r.accepted is expected_accept
+
+
+def test_parentheses_balance_deep_nesting() -> None:
+    """Derin iç içe parantez de doğru çalışmalı."""
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "student_choice.yaml")
+    r = tm.run("(((())))", max_steps=10000)
+    assert r.accepted is True
+
+
+def test_parentheses_balance_extra_close_then_open() -> None:
+    """Sayı eşit olsa bile sıra bozuksa reddedilmeli."""
+    tm = SingleTapeTM.from_yaml(MACHINES_DIR / "student_choice.yaml")
+    r = tm.run("(()))(", max_steps=10000)
+    assert r.accepted is False

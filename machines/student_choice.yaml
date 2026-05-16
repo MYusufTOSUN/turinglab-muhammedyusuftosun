@@ -1,0 +1,32 @@
+name: parentheses_balance
+description: Parantez denge kontrolü. Dengeli ise kabul. Örn. (()()) kabul, (() ret.
+
+states: [q_scan_right, q_match_left, q_rewind, q_check_remaining, q_accept]
+
+input_alphabet: ["(", ")"]
+tape_alphabet: ["(", ")", "X", "B"]
+blank: "B"
+start_state: q_scan_right
+accept_states: [q_accept]
+reject_states: []
+
+transitions:
+  # En soldaki işaretsiz ')' bulana kadar sağa git
+  - {state: q_scan_right, read: "(", next: q_scan_right,      write: "(", move: R}
+  - {state: q_scan_right, read: "X", next: q_scan_right,      write: "X", move: R}
+  - {state: q_scan_right, read: ")", next: q_match_left,      write: "X", move: L}
+  - {state: q_scan_right, read: "B", next: q_check_remaining, write: "B", move: L}
+
+  # Sola dön, en yakın işaretsiz '(' bul (stack tepesi); yoksa unmatched ')' -> ret
+  - {state: q_match_left, read: "X", next: q_match_left, write: "X", move: L}
+  - {state: q_match_left, read: "(", next: q_rewind,     write: "X", move: L}
+  # 'B' okumak burada: kapanan parantezin eşleşeni yok -> no_transition -> ret
+
+  # Sol uca dön (işaretsiz '(' soldaki bir önceki yığın elemanı olabilir)
+  - {state: q_rewind, read: "(", next: q_rewind,     write: "(", move: L}
+  - {state: q_rewind, read: "X", next: q_rewind,     write: "X", move: L}
+  - {state: q_rewind, read: "B", next: q_scan_right, write: "B", move: R}
+
+  # Sağ uçtan sola tara; sadece X olmalı, '(' kalmışsa unmatched -> no_transition -> ret
+  - {state: q_check_remaining, read: "X", next: q_check_remaining, write: "X", move: L}
+  - {state: q_check_remaining, read: "B", next: q_accept,          write: "B", move: R}

@@ -181,3 +181,62 @@ sonrası ilk rewind (henüz A/D yokken) sorunsuzdu, ama 2. iterasyonda sola
 dönerken A okuyunca makine duruyordu (no_transition). Test `abba` için 11.
 adımda halt etti; verbose modu açıp `Adım 11 | Durum: q_rewind | Şerit: Abb[A]...`
 satırını görünce `q_rewind` transition listesinin eksik olduğunu anladım.
+
+## TM-4 · Parantez Denge Kontrolü (Öğrenci Seçimi)
+
+**Dosya:** `machines/student_choice.yaml`
+**Girdi:** `(` ve `)` karakterlerinden oluşan dizgi (örn. `(()())`)
+**Kabul:** Parantezler dengeli ise
+
+El kitabındaki dört seçenek arasından (c) seçeneğini tercih ettim. Sebep:
+diğer üç TM hep transducer (girdiyi dönüştürüyor); bu ise decider, çeşitlilik
+katıyor. Aynı zamanda stack-tabanlı bir yapıyı tek-şeritte mark-and-pair ile
+simüle etmek hesaplama kuramı dersi için temsili bir alıştırma.
+
+### 1. Strateji
+
+Klasik mark-and-pair (yığın simülasyonu tek şeritte):
+
+1. `q_scan_right`: soldan sağa tara, ilk işaretsiz `)` bulunca X ile işaretle.
+2. `q_match_left`: sola dön, en yakın işaretsiz `(` bulunca onu da X yap. Bu
+   "en yakın" yani henüz kapatılmamış en içteki açık parantez — stack tepesi.
+3. `q_rewind`: sol uca dön, sonra adım 1'e geri.
+4. q_scan_right `B` (sağ uç) görürse: tüm `)`'ler işaretlenmiş; ama hâlâ
+   eşleşmemiş `(` kalmış olabilir. `q_check_remaining`: sağdan sola tara,
+   sadece X bekleyerek; `(` görürsen unmatched → ret.
+5. q_match_left `B` (sol uç) görürse: kapanan paren'in eşleşeni yok → ret.
+
+### 2. Durum sayısı
+
+5 durum: `q_scan_right`, `q_match_left`, `q_rewind`, `q_check_remaining`,
+`q_accept`. Diğer TM'lere göre kompakt çünkü her durumun işi netçe tek bir yöne
+gidiyor ve karşılaştırma/seçme kararı yok (sadece "X gör/atla, paren gör/işaretle").
+
+### 3. Şerit alfabesi
+
+`{(, ), X, B}`. Tek bir X işareti yetti çünkü açık ve kapalı paren'i ayrı
+işaretlere ihtiyaç yok — bir kez eşleştirildikten sonra "işaretlenmiş" bilgisi
+kâfi. Açık paren'in nerede olduğunu hatırlamak gerekirse pozisyon belirleyici
+(`#` veya başka marker) eklenmeliydi, ama bu algoritmada gerekmiyor.
+
+### 4. Karmaşıklık
+
+n uzunluğundaki girdi için her `)` eşleştirmesi tarama+geri-dön döngüsü
+yaratıyor (O(n)), ve en fazla n/2 paren çifti var. Toplam **O(n²)**. Smoke
+testte n=6 `(()())` için 42 adım, n=8 `(((())))` için 70 adım çıktı.
+
+### 5. Hata ayıklama hikayesi
+
+İlk versiyonda `q_rewind`'e `(` için kural yazmamıştım — sadece X ve B için
+düşündüm. İlk iterasyon zaten X'siz başlıyordu, sorun çıkmadı; ama `(())`
+testinde iter 1'de pos 2'deki `)`'yi eşleştirip pos 1'deki `(`'yi işaretledikten
+sonra `q_rewind`, pos 0'daki işaretsiz `(`'i okuduğunda kural bulamadı ve makine
+no_transition ile durdu. Beklenen sonuç kabuldü, ama sonuç ret oldu. Verbose'ı
+açıp 7. adımda `Adım 7 | Durum: q_rewind | Şerit: [(]XX) | (durdu: no_transition)`
+satırını görünce `q_rewind`'e işaretsiz `(`'lerin de gelebileceğini fark ettim
+(çünkü stack tepesi her zaman pos 0'da olmuyor). `(` → L ekleyince sorun çözüldü.
+
+İkinci nokta: ilk başta `q_match_left` 'B' için "no transition" yerine `q_reject`
+diye bir durum tanımlamayı düşündüm, sonra vazgeçtim. Motor zaten no_transition
+ile `accepted=False, reason="no_transition"` dönüyor — gereksiz state olmasın
+diye eklemedim. El kitabı reject_states'i opsiyonel bırakıyor zaten.
