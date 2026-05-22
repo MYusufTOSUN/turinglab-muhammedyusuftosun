@@ -12,7 +12,7 @@
 
 Çalışan TM motoru + Bölüm 2'de tasarladığım makinelerin demo kaydı (Türkçe anlatım, ~6 dk):
 
-🎥 https://drive.google.com/file/d/1xl-5k0JfHMs4ojPaN3Zk07yMoQ8taoDY/view?usp=sharing
+🎥 https://www.youtube.com/watch?v=BqMO2R-nZyQ
 
 ---
 
